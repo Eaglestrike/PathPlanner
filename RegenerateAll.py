@@ -13,8 +13,8 @@ directory = "Saves/"
 files = os.listdir(directory)
 
 path = Path.Path(mode = "trapezoidal")
-path.maxA = 5.5
-path.maxV = 5.5
+path.maxA = newMaxV
+path.maxV = newMaxA
 
 for f in files:
     if ".csv" not in f:
