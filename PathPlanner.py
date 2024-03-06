@@ -64,8 +64,8 @@ logo = Image.fromarray(data)
 #canvas.addImage(Vector(0.0,0.0), 2.0, logo)
 
 path = Path.Path(mode = "trapezoidal", canvas = canvas, layer = 5)
-path.maxA = 2.5
-path.maxV = 3.0
+path.maxA = 5.5
+path.maxV = 5.5
 
 pose = DB.DrivePose(Vector(0,0), 0.5, Vector(0,0), 0.0)
 drivebase = DB.Drivebase(pose, 0.6858, canvas, trails = True, vectors = True, wheelTrails= False)
