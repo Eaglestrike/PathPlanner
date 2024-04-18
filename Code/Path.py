@@ -13,6 +13,19 @@ import Simulation.Drivebase as DB
 from Util.Vector import Vector
 import Util.TrapezoidalProfile as TP
 
+h00 = lambda t :  2 * t * t * t - 3 * t * t + 1
+h10 = lambda t :  t * t * t - 2 * t * t + t
+h01 = lambda t :  -2 * t * t * t + 3 * t * t
+h11 = lambda t :  t * t * t - t * t
+h00d = lambda t :  6 * t * t - 6 * t
+h10d = lambda t :  3 * t * t - 4 * t + 1
+h01d = lambda t :  6 * t - 6 * t * t
+h11d = lambda t :  3 * t * t - 2 * t
+h00dd = lambda t :  12 * t - 6
+h10dd = lambda t :  6 * t - 4
+h01dd = lambda t :  6 - 12 * t
+h11dd = lambda t :  6 * t - 2
+
 class Path():
     #Modes: linear, trapezoidal, hermite
     def __init__(self, mode = "linear", canvas = None, layer = 0, color = "blue"):
@@ -37,12 +50,22 @@ class Path():
         self.layer = layer
         
     def addPose(self, pose, time):
-        self.poses.append([pose, time])
+        if len(self) == 0:
+            time = 0.0
+            self.poses.append([pose, time])
+        else:
+            index = 0
+            while self.poses[index][1] < time:
+                index += 1
+                if index >= len(self.poses):
+                    break
+            self.poses.insert(index, [pose, time])
+
         size = len(self)
         if size > 1:
             self.generatePath(size - 2)
         
-    def getPose(self, time):
+    def getPose(self, time:float):
         if len(self.poses) == 0:
             return DB.DrivePose(Vector(0,0), 0)
         if time < self.poses[0][1]:
@@ -54,7 +77,7 @@ class Path():
             if time < t2:
                 if self.mode == "linear":
                     return pose1.interpolate(pose2, time - t1, length)
-                if self.mode == "trapezoidal":
+                elif self.mode == "trapezoidal":
                     par = pose2.vel.unit()
                     perp = par.rotateCCW()
                     parPath, perpPath = self.segments[n]
@@ -66,6 +89,18 @@ class Path():
                     dAng = pose2.ang - pose1.ang
                     ang = pose1.ang + dAng*(t/length)
                     return DB.DrivePose(pos, ang, vel, dAng/length)
+                elif self.mode == "hermite":
+                    tNew = (time - t1)/(t2 - t1)
+                    ang = pose1.ang * h00(tNew) + pose1.angVel * h10(tNew) + pose2.ang * h01(tNew) + pose2.angVel * h11(tNew)
+                    pos = pose1.pos * h00(tNew) + pose1.vel * h10(tNew) + pose2.pos * h01(tNew) + pose2.vel * h11(tNew)
+                    angVel = pose1.ang * h00d(tNew) + pose1.angVel * h10d(tNew) + pose2.ang * h01d(tNew) + pose2.angVel * h11d(tNew)
+                    vel = pose1.pos * h00d(tNew) + pose1.vel * h10d(tNew) + pose2.pos * h01d(tNew) + pose2.vel * h11d(tNew)
+                    vel /= (t2 - t1)
+                    angVel /= (t2 - t1)
+                            
+                    return DB.DrivePose(pos, ang, vel, angVel)
+                else:
+                    print("Wrong Mode")
         return self.poses[-1][0]
     
     def getStartTime(self):
@@ -78,13 +113,30 @@ class Path():
             return 0
         return self.poses[-1][1]
     
-    def updateTimes(self, index):
+    #Updates the times of the waypoints
+    def updateTimes(self, index:int):
         if self.mode == "trapezoidal":
             size = len(self)
             while index < size - 1:
                 pose1, t1 = self.poses[index]
                 parPath, perpPath = self.segments[index]
                 self.poses[index+1][1] = t1 + max(parPath.getDuration(), perpPath.getDuration())
+                index += 1
+        elif self.mode == "hermite":
+            size = len(self)
+            while index < size - 1:
+                pose1, t1 = self.poses[index]
+                pose2, t2 = self.poses[index + 1]
+
+                #Estimate time with a linear path
+                dir = (pose2.pos - pose1.pos)
+                dist = dir.mag()
+                dir = dir.unit()
+
+                p1 = TP.Pose(0.0, dir.dot(pose1.vel), 0.0)
+                p2 = TP.Pose(dist, dir.dot(pose2.vel), 0.0)
+
+                self.poses[index+1][1] = t1 + max(TP.TrapezoidalProfile(self.maxV, self.maxA, p1, p2).getDuration(), 0.01)
                 index += 1
     
     def generatePath(self, index):
@@ -107,6 +159,8 @@ class Path():
             perpPath = TP.TrapezoidalProfile(self.maxA, self.maxV, initPosePerp, finalPosePerp)
             self.segments[index] = (parPath, perpPath)
             self.updateTimes(index)
+        elif self.mode == "hermite":
+            self.updateTimes(0)
             
         if self.canvas is not None:
             self._drawPath(index)
@@ -128,6 +182,7 @@ class Path():
                 pose = self.getPose(t + t1)
                 points.append(pose.pos)
                 t += 0.1
+            points.append(self.getPose(t2).pos)
         
         if self.canvasPaths[index] is None:
             self.canvasPaths[index] = self.canvas.addPlotter(points, self.color, layer = self.layer)
@@ -143,7 +198,8 @@ class Path():
         
         self.selectedIndex = -1
         self._updateSelect()
-            
+    
+    #Updates the canvas
     def _updateSegment(self, index):
         pose, t = self.poses[index]
         if self.mode == "linear":
@@ -151,7 +207,7 @@ class Path():
                 self.canvasPaths[index-1].editPoint(1, pose.pos)
             if index != len(self) -1:
                 self.canvasPaths[index].editPoint(0, pose.pos)
-        elif self.mode == "trapezoidal":
+        else:
             if index != 0:   
                 self.generatePath(index-1)
             if index != len(self) -1:
@@ -243,7 +299,7 @@ class Path():
             self.addPose(path, t)
     
     def setMode(self, mode):
-        if mode not in ("linear", "trapzoidal"):
+        if mode not in ("linear", "trapzoidal", "hermite"):
             return
     
     def toDataframe(self):
@@ -264,28 +320,33 @@ class Path():
         self.clear()
         self.addDataFrame(dataFrame)
     
-    def addDataFrame(self, dataFrame):
+    def addDataFrame(self, dataFrame:pd.DataFrame):
         if len(self) == 0:
             t = 0
         else:
-            t = self.poses[-1][1]
+            t = self.poses[-1][1] + 0.0001
         for index, row in dataFrame.iterrows():
             pos = Vector(row["x"], row["y"])
             vel = Vector(row["vx"], row["vy"])
             pose = DB.DrivePose(pos, row["ang"], vel, row["angVel"])
-            self.addPose(pose, row["t"] + t)
+            self.poses.append([pose, row["t"] + t])
+        self.regenerate()
     
     def regenerate(self):
         self.selectedIndex = -1
         self._updateSelect()
         for i in range(len(self)-1):
             self.generatePath(i)
-            
-    def copy(self, other):
-        self.clear()
-        for path, t in other.poses:
-            self.addPose(path, t)
-        self.regenerate()
+
+    def copy(self, canvas = True):
+        if canvas:
+            path = Path(self.mode, self.canvas, self.layer, self.color)
+        else:
+            path = Path(self.mode)
+        for pose, t in self.poses:
+            path.addPose(pose.copy(), t)
+        path.regenerate()
+        return path
         
     def scale(self, k):
         for n, pose in enumerate(self.poses):

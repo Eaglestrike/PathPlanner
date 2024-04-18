@@ -15,7 +15,7 @@ def sign(x):
         return 0.0
 
 class Pose():
-    def __init__(self, pos, vel, acc):
+    def __init__(self, pos:float, vel:float, acc:float):
         self.pos = pos
         self.vel = vel
         self.acc = acc

@@ -10,6 +10,7 @@ import json
 import os
 import pandas as pd
 
+
 def selectOpenFile(fileTypes, directory = None):
     if directory is None:
         directory = os.cwd()
@@ -19,11 +20,12 @@ def selectOpenFile(fileTypes, directory = None):
                     filetypes = fileTypes)
     return filename
 
-def selectSaveFile(fileTypes, directory = None):
+def selectSaveFile(fileTypes, directory = None, initFile = ""):
     if directory is None:
         directory = os.cwd()
     filename = filedialog.asksaveasfile(
                     initialdir = directory,
+                    initialfile = initFile,
                     title = "Save file",
                     filetypes = fileTypes)
     return filename
@@ -46,11 +48,13 @@ def selectSaveJsonFile(dictionary, directory = None):
         json.dump(dictionary, fp)
     return filename
 
-def selectDataframe(directory = None):
+def selectDataframe(directory = None, returnFileName = False):
     files = [('csv files', '*.csv')]
     filename = selectOpenFile(files, directory)
     if filename == "" or filename is None:
         return
+    if returnFileName:
+        return pd.read_csv(filename), filename.name
     return pd.read_csv(filename)
 
 def saveJsonFile(dictionary, filepath):
