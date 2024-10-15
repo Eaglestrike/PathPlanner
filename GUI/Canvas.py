@@ -13,6 +13,8 @@ from Util.Vector import Vector
 
 from GUI.Plotter import Plotter
 
+displayInches = False
+
 class CanvasPoint():
     def __init__(self, pos, color, canvas, layer = 0):
         self.pos = pos
@@ -349,7 +351,10 @@ class Canvas():
         canvasPos = Vector(event.x, event.y)
         pos = self.getFieldPos(canvasPos)
         self.canvas.coords(self.mouseText, canvasPos.x, canvasPos.y-10)
-        self.canvas.itemconfig(self.mouseText, text = str(pos))
+        if displayInches:
+            self.canvas.itemconfig(self.mouseText, text = str(pos/0.0254))
+        else:
+            self.canvas.itemconfig(self.mouseText, text = str(pos))
         
     def dragged(self, event):
         point = Vector(event.x, event.y)

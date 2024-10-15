@@ -5,14 +5,15 @@ import Code.Path as Path
 
 
 newMaxV = 5.5
-newMaxA = 5.5
+newMaxA = 10.0
 
 filesType = ["Far"]
 
-directory = "Saves/"
+#directory = "Saves/"
+directory = r"C:/Users/degog/Robotics/2024-RobotCode/src/main/deploy/"
 files = os.listdir(directory)
 
-path = Path.Path(mode = "trapezoidal")
+path = Path.Path(mode = "hermite")
 path.maxA = newMaxV
 path.maxV = newMaxA
 

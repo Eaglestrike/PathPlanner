@@ -336,6 +336,8 @@ class Path():
         self.selectedIndex = -1
         self._updateSelect()
         for i in range(len(self)-1):
+            if i == 0:
+                self.poses[i][1] = 0.0
             self.generatePath(i)
 
     def copy(self, canvas = True):
